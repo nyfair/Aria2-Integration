@@ -57,7 +57,7 @@ function sendTo(url, fileName, filePath, header, server) {
 							function (res) {
 								aria2.addUri([url], params).then(
 									function (res) {
-										monitor(options);
+										monitor(options, res);
 										notify(browser.i18n.getMessage("success_connect", fileName) + "\n\n" + url);
 										aria2.close();
 									},
@@ -66,7 +66,7 @@ function sendTo(url, fileName, filePath, header, server) {
 										setTimeout( () => {
 											aria2.addUri([url], params).then(
 												function (res) {
-													monitor(options);
+													monitor(options, res);
 													notify(browser.i18n.getMessage("success_connect", fileName) + "\n\n" + url);
 													aria2.close();
 												},
@@ -86,7 +86,7 @@ function sendTo(url, fileName, filePath, header, server) {
 									aria2.open().then( () => {
 										aria2.addUri([url], params).then(
 											function (res) {
-												monitor(options);
+												monitor(options, res);
 												notify(browser.i18n.getMessage("success_connect", fileName) + "\n\n" + url);
 												aria2.close();
 											},
@@ -449,40 +449,60 @@ function getFileName(d) {
 	// get file name
 	var fileName = "";
 	var id = 0;
-	var id1 = 0;
 	id = d.responseHeaders.findIndex(x => x.name.toLowerCase() === "content-disposition");
 	if (id >= 0) {
-		id1 = d.responseHeaders[id].value.lastIndexOf("\'");
-		if (id1 >= 0) {
-			fileName = d.responseHeaders[id].value.slice(id1 + 1);
+		var PARAM_REGEXP = /;[\x09\x20]*([!#$%&'*+.0-9A-Z^_`a-z|~-]+)[\x09\x20]*=[\x09\x20]*("(?:[\x20!\x23-\x5b\x5d-\x7e\x80-\xff]|\\[\x20-\x7e])*"|[!#$%&'*+.0-9A-Z^_`a-z|~-]+)[\x09\x20]*/g;
+		var EXT_VALUE_REGEXP = /^([A-Za-z0-9!#$%&+\-^_`{}~]+)'(?:[A-Za-z]{2,3}(?:-[A-Za-z]{3}){0,3}|[A-Za-z]{4,8}|)'((?:%[0-9A-Fa-f]{2}|[A-Za-z0-9!#$&+.^_`|~-])+)$/;
+		var QESC_REGEXP = /\\([\u0000-\u007f])/g;
+
+		var string = d.responseHeaders[id].value;
+
+		var key;
+		var value;
+
+		var match = PARAM_REGEXP.exec(string);
+		if (!match) {
+			fileName = getFileNameURL(d.url);
+			return fileName;
 		}
-		else {
-			id1 = d.responseHeaders[id].value.lastIndexOf("=");
-			if (id1 >= 0) {
-				fileName = d.responseHeaders[id].value.slice(id1 + 1);
+
+		key = match[1].toLowerCase();
+		value = match[2];
+
+		if (key.indexOf('*') + 1 === key.length) {
+			var match = EXT_VALUE_REGEXP.exec(value)
+			if (!match) {
+				fileName = getFileNameURL(d.url);
+				return fileName;
 			}
 			else {
-				id = d.url.lastIndexOf("/");
-				if (id >= 0) {
-					id1 = d.url.lastIndexOf("?");
-					if (id1 == -1) {
-						fileName = d.url.slice(id + 1);
-						
-					}
-				}
+				value = match[2];
 			}
 		}
+
+		if (value[0] === '"') {
+			// remove quotes and escapes
+			value = value.substr(1, value.length - 2).replace(QESC_REGEXP, '$1');
+		}
+		fileName = value;
+
 	}
 	else {
-		id = d.url.lastIndexOf("/");
-		if (id >= 0) {
-			id1 = d.url.lastIndexOf("?");
-			if (id1 == -1) {
-				fileName = d.url.slice(id + 1);	
-			}
-			else {
-				fileName = d.url.slice(id + 1, id1);
-			}
+		fileName = getFileNameURL(d.url);
+	}
+	return fileName;
+}
+
+function getFileNameURL(url) {
+	var fileName = "";
+	var id = url.lastIndexOf("/");
+	if (id >= 0) {
+		var id1 = url.lastIndexOf("?");
+		if (id1 == -1) {
+			fileName = url.slice(id + 1);
+		}
+		else {
+			fileName = url.slice(id + 1, id1);
 		}
 	}
 	return fileName;
@@ -498,7 +518,7 @@ function getFileSize(d){
 	return fileSize;
 }
 
-function getRequestHeaders(id, ua) {
+function getRequestHeaders(d, ua) {
 	// create header
 	var id1;
 	var requestHeaders = [];
@@ -509,10 +529,10 @@ function getRequestHeaders(id, ua) {
 		var getheader = ['Referer', 'Cookie', 'Cookie2', 'Authorization'];
 	}
 	for (var i = 0; i < getheader.length; i++) {
-		id1 = request[id].requestHeaders.findIndex(x => x.name === getheader[i]);
+		id1 = d.requestHeaders.findIndex(x => x.name === getheader[i]);
 		if (id1 >= 0) {
-			requestHeaders[i] = request[id].requestHeaders[id1].name + ": " +
-				request[id].requestHeaders[id1].value;
+			requestHeaders[i] = d.requestHeaders[id1].name + ": " +
+				d.requestHeaders[id1].value;
 		}
 	}
 	return requestHeaders;
@@ -522,7 +542,7 @@ function isException(d) {
 	// check Exception
 	var id = d.responseHeaders.findIndex(x => x.name.toLowerCase() === "content-length");
 	if(id != -1) {
-		if(d.responseHeaders[id].value < fileSizeLimit){
+		if(Number(d.responseHeaders[id].value) < Number(fileSizeLimit)){
 			return true;
 		}
 	}
@@ -550,11 +570,12 @@ async function prepareDownload(d) {
 	
 	// get request item
 	var id = request.findIndex(x => x.requestId === d.requestId);
+	const reqFound = { ...request[id] };
 	if (id >= 0) {
 		// create header
 		var get = browser.storage.local.get(config.command.guess);
 		await get.then(item => {
-			details.requestHeaders = getRequestHeaders(id, item.ua);
+			details.requestHeaders = getRequestHeaders(reqFound, item.ua);
 		});
 		// delete request item
 		request.splice(id, 1);
@@ -567,8 +588,12 @@ async function prepareDownload(d) {
 	details.fileName = getFileName(d);
 	
 	// decode URI Component
-	details.url = decodeURIComponent(details.url);
 	details.fileName = decodeURIComponent(details.fileName);
+
+	// issue #8
+	try {
+		details.fileName = decodeURI(escape(details.fileName));
+	} catch (e){}
 
 	// file name cannot have ""
 	details.fileName = details.fileName.replace('\";', '');
@@ -587,8 +612,8 @@ async function prepareDownload(d) {
 	
 	// create download panel
 	browser.storage.local.get(config.command.guess, item => {
-		if (item.cmDownPanel) {
-			downloadPanel(d);
+		if (item.downPanel) {
+			downloadPanel(details);
 		}
 		else {
 			sendTo(details.url,details.fileName,"",details.requestHeaders,"1");
@@ -619,7 +644,7 @@ function observeResponse(d) {
 		if (d.responseHeaders.find(x => x.name.toLowerCase() === 'content-disposition') != undefined) {
 			var contentDisposition = d.responseHeaders.find(x => x.name.toLowerCase() ===
 				'content-disposition').value.toLowerCase();
-			if (contentDisposition.slice(0, 10) == "attachment") {
+			if (contentDisposition.slice(0, 10) == "attachment" || aggressive) {
 				//console.log(contentDisposition);
 				if (isException(d))
 					return {cancel: false};
@@ -627,7 +652,7 @@ function observeResponse(d) {
 				return {cancel: true};
 			}
 		}
-		else if (d.responseHeaders.find(x => x.name.toLowerCase() === 'content-type') != undefined) {
+		if (d.responseHeaders.find(x => x.name.toLowerCase() === 'content-type') != undefined) {
 			var contentType = d.responseHeaders.find(x => x.name.toLowerCase() === 'content-type').value
 				.toLowerCase();
 			if (contentType.slice(0, 11) == "application" 
@@ -658,14 +683,14 @@ function observeResponse(d) {
 					prepareDownload(d);
 					return {cancel: true};
 				} 
-				else if (contentType.slice(0, 4) == "video") {
+				else if (contentType.slice(0, 5) == "video") {
 					//console.log(contentType);
 					if (isException(d))
 						return {cancel: false};
 					prepareDownload(d);
 					return {cancel: true};
 				}
-				else if (contentType.slice(0, 4) == "audio") {
+				else if (contentType.slice(0, 5) == "audio") {
 					//console.log(contentType);
 					if (isException(d))
 						return {cancel: false};
@@ -768,7 +793,7 @@ function cmCallback (info, tab) {
 			}
 			var d = {
 				url: url,
-				fileName: "",
+				fileName: getFileNameURL(url),
 				fileSize: "",
 				requestHeaders: requestHeaders
 			}
@@ -780,8 +805,6 @@ function cmCallback (info, tab) {
 					sendTo(url,"","",requestHeaders,server);
 				}
 			});
-			//sendTo(url,"","",requestHeaders);
-			//downloadPanel(d);
 			console.log(info);
 		}, (e) => {
 			console.log("Error", e);
@@ -790,7 +813,7 @@ function cmCallback (info, tab) {
 			requestHeaders += "]";
 			var d = {
 				url: url,
-				fileName: "",
+				fileName: getFileNameURL(url),
 				fileSize: "",
 				requestHeaders: requestHeaders
 			}
@@ -802,8 +825,6 @@ function cmCallback (info, tab) {
 					sendTo(url,"","",requestHeaders,server);
 				}
 			});
-			//sendTo(url,"","",requestHeaders);
-			//downloadPanel(d);
 			console.log(info);
 		} );;
 	}

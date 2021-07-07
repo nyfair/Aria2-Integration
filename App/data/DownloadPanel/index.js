@@ -7,7 +7,7 @@ function handleResponse(message) {
 		case "all":
 			document.getElementById('url').value = message.url;
 			document.getElementById('fs').textContent = message.fileSize;
-			document.getElementById('fn').value = message.fileName;
+			document.getElementById('fn').value = decodeFn(message.fileName);
 			document.querySelector(".head").value = message.header;
 			document.getElementById('db').focus();
 			break;
@@ -105,7 +105,6 @@ function save() {
 		if (e.length != 0) {
 			document.getElementById('fn').style = "border: 1px solid red;box-shadow: red 0px 0px 4px;";
 			document.getElementById('fn').onchange = function() {
-				console.log("123");
 				document.getElementById('fn').style = "";
 				document.getElementById('fn').onchange = null;
 			};
@@ -137,7 +136,6 @@ function saveas() {
 		if (e.length != 0) {
 			document.getElementById('fn').style = "border: 1px solid red;box-shadow: red 0px 0px 4px;";
 			document.getElementById('fn').onchange = function() {
-				console.log("123");
 				document.getElementById('fn').style = "";
 				document.getElementById('fn').onchange = null;
 			};
@@ -184,6 +182,25 @@ function adv() {
 		document.querySelector(".s1").style = "display:none";
 		advl = false;
 	}
+}
+
+function decodeFn(fn) {
+	var res = jschardet.detect(fn).encoding;
+	if (res != "ascii") {
+		var decoder = new TextDecoder(res);
+		var charcode = [];
+		for(var i = 0, length = fn.length; i < length; i++) {
+			var code = fn.charCodeAt(i);
+			charcode.push(code);
+		}
+		var charcodeUint = new Uint8Array();
+		charcodeUint = Uint8Array.from(charcode);
+		var out = decoder.decode(charcodeUint);
+	}
+	else {
+		var out = fn;
+	}
+	return out;
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -68,10 +68,10 @@ body {
 .switch {
     position: relative;
     display: inline-block;
-    height: 34px;
+    height: 32px;
     width: 60px;
     left: 19px;
-    top: 12px;
+    top: 8px;
     border-radius: 2px;
 }
 .switch input {
@@ -93,7 +93,7 @@ body {
 .slider::before {
     position: absolute;
     content: "";
-    height: 26px;
+    height: 24px;
     width: 26px;
     left: 4px;
     bottom: 4px;
@@ -117,9 +117,9 @@ input:checked + .slider::before {
 .gwd-button-rcsv {
     position: absolute;
     width: 60px;
-    height: 34px;
+    height: 32px;
     left: 20px;
-    top: 54px;
+    top: 48px;
     background-image: none;
     background-color: rgb(44, 173, 255);
     border-style: none;
@@ -139,6 +139,10 @@ input:checked + .slider::before {
           <span class="slider"></span>
         </label>
         <button class="gwd-button-rcsv" style="text-shadow: rgb(0, 64, 91) 0px 0px 0.5px; color: rgb(255, 255, 255);" id="detail" data-message="UI_detail">Detail</button>
+        <div style="position:absolute;left:16px;top:80px;font-size:12px">
+          <input id="downPanel" type="checkbox" style="width:12px;height:12px;">
+          <label data-message="OP_downPanel" for="downPanel"></label>
+        </div>
       </div>
     </div>
   </div>

@@ -45,6 +45,7 @@ function detail() {
 				browser.tabs.create({
 					url: ariangUrl
 				});
+				window.close();
 			});
 		}
 	});
@@ -58,6 +59,12 @@ function launch() {
 	});
 	browser.storage.local.get("enabled", function(item) {
 		document.getElementById('switch').checked = item.enabled;
+	});
+	browser.storage.local.get(config.command.guess, function(item) {
+		document.getElementById('downPanel').checked = item.downPanel;
+		document.getElementById('downPanel').addEventListener('change', (event) => {
+			browser.storage.local.set({downPanel: event.currentTarget.checked})
+		})
 	});
 }
 //document.addEventListener('WebComponentsReady', launch, false);

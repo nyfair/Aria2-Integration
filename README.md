@@ -10,4 +10,11 @@ https://github.com/mayswind/AriaNg
 
 ## Monkey Patch
 * fix https/wss protocol
-* optional skip download panel
+* configure download panel in addon popup menu
+* integrate latest AriaNg
+
+## AriaNg Modification
+* index.html  
+ng-app="ariaNg" **ng-csp**
+* js/angular-packages-{version}.min.js  
+https?|s?ftp|mailto|tel|file **|moz-extension**
