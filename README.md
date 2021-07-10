@@ -10,7 +10,7 @@ https://github.com/mayswind/AriaNg
 
 ## Monkey Patch
 * fix https/wss protocol
-* configure download panel in addon popup menu
+* configurable download panel in addon popup menu
 * integrate latest AriaNg
 
 ## AriaNg Modification
